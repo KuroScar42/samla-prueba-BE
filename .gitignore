@@ -1,0 +1,38 @@
+# Node.js
+node_modules/
+
+# npm package lock file
+package-lock.json
+
+# dotenv environment files
+.env
+.env.*
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Firebase Emulator Cache
+firebase-debug.log
+firebase/hosting/.cache
+
+# Coverage directory
+coverage/
+
+# npm package modules, yarn modules
+node_modules/
+
+# Ignore build output (for example, when using TypeScript)
+dist/
+build/
+
+# VSCode settings folder
+.vscode/
+samla-prueba-firebase-service.json

@@ -1,0 +1,24 @@
+{
+  "name": "samla-prueba-BE",
+  "version": "1.0.0",
+  "description": "Este proyecto es una prueba tecnica para la entrevista del puesto de React Developer - Syntepro - Backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KuroScar42/samla-prueba-BE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KuroScar42/samla-prueba-BE/issues"
+  },
+  "homepage": "https://github.com/KuroScar42/samla-prueba-BE#readme",
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.2"
+  }
+}
