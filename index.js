@@ -7,6 +7,7 @@ import {
   getDocs,
   doc,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { userSchema } from "./utils/index.js";
@@ -101,11 +102,11 @@ app.get("/getAllUsers", async (req, res) => {
 });
 
 app.post(
-  "/imageUpload/:userId",
+  "/imageUpload/:userId/:type",
   bodyParser.raw({ type: ["image/jpeg", "image/png"], limit: "5mb" }),
   async (req, res) => {
     try {
-      const { userId } = req.params;
+      const { userId, type } = req.params;
       const contentType = req.headers["content-type"];
 
       if (!userId) {
@@ -123,7 +124,7 @@ app.post(
           .send({ error: "Invalid file type. Only JPEG and PNG are allowed." });
       }
 
-      const fileName = `ID_Documents/${userId}`;
+      const fileName = `ID_Documents/${userId}-${type}`;
       const storageRef = ref(storage, fileName);
       const metadata = { contentType };
 
@@ -132,7 +133,18 @@ app.post(
       const imageUrl = await getDownloadURL(storageRef);
 
       const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, { documentImageUrl: imageUrl });
+      const user = await getDoc(userRef);
+      const userData = user.data();
+
+      if (userData.documentImageUrl) {
+        await updateDoc(userRef, {
+          documentImageUrl: [...userData.documentImageUrl, imageUrl],
+        });
+      } else {
+        await updateDoc(userRef, { documentImageUrl: [imageUrl] });
+      }
+
+      // await updateDoc(userRef, { documentImageUrl: imageUrl });
 
       res
         .status(201)
@@ -189,11 +201,9 @@ app.post(
         }
       );
 
-      if (response.data && response.data?.length > 0) {
-        return res.status(200).send("Face Detected");
-      } else {
-        return res.status(400).send("No Face Detected");
-      }
+      return res
+        .status(200)
+        .send({ validFace: response.data && response.data?.length > 0 });
     } catch (error) {
       console.error("Error during face analysis:", error);
       res
