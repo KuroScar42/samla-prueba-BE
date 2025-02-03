@@ -7,3 +7,11 @@ service cloud.firestore {
     }
   }
 }
+
+service cloud.firestorage {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

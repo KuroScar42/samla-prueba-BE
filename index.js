@@ -1,48 +1,207 @@
 import express from "express";
 import functions from "firebase-functions";
-import { db } from "./config/firebase-settings.js";
-import { doc, getDoc } from "firebase/firestore";
-
-// const admin = require("firebase-admin");
-
-// Initialize Firebase Admin SDK with your service account credentials
-// const serviceAccount = require("./firebase-service-account.json");
-// admin.initializeApp({
-//   credential: admin.credential.cert(serviceAccount),
-//   databaseURL: "https://<your-database-name>.firebaseio.com",
-// });
+import { db, storage } from "./config/firebase-settings.js";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { userSchema } from "./utils/index.js";
+import cors from "cors";
+import bodyParser from "body-parser";
+import axios from "axios";
+import FormData from "form-data";
 
 const app = express();
 const port = 3131;
 
 app.use(express.json());
 
-// Sample route to test the backend
-app.get("/", (req, res) => {
-  res.send("Hello from Express and Firebase!");
-});
-app.get("/testing", async (req, res) => {
-  const ref = doc(db, "test", "KDYoauj6H84w5QfndiCE");
-  const result = await getDoc(ref);
-  if (result.exists()) {
-    res.send(result.data());
-  } else {
-    res.send("Nel");
+app.use(cors());
+
+app.post("/registerUser", async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneCountryCode,
+      telephone,
+      idType,
+      idNumber,
+      department,
+      municipality,
+      direction,
+      monthlyEarns,
+    } = req.body;
+
+    const { error, value } = userSchema.validate(req.body, {
+      abortEarly: false,
+    });
+
+    if (error) {
+      return res.send(error.details);
+    }
+
+    const newDocRef = collection(db, "users");
+    const resultRef = await addDoc(newDocRef, {
+      firstName,
+      lastName,
+      email,
+      phoneCountryCode,
+      telephone,
+      idType,
+      idNumber,
+      department,
+      municipality,
+      direction,
+      monthlyEarns,
+    });
+
+    res
+      .status(201)
+      .send({ message: "User info saved successfully", id: resultRef.id });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({ error: "Error saving data: " + error.message });
   }
 });
 
-// Firebase route (example: add data to Firestore)
-app.post("/addData", async (req, res) => {
+const getFileDownloadURL = async (fileName) => {
+  const storageRef = ref(storage, `ID_Documents/${fileName}`);
+  const url = await getDownloadURL(storageRef);
+  return url;
+};
+
+app.get("/getAllUsers", async (req, res) => {
   try {
-    const { collection, document, data } = req.body;
-    const db = admin.firestore();
-    const docRef = db.collection(collection).doc(document);
-    await docRef.set(data);
-    res.status(200).send("Data added successfully");
+    const usersCollection = collection(db, "users");
+    const querySnapshot = await getDocs(usersCollection);
+    const users = await Promise.all(
+      querySnapshot.docs.map(async (doc) => {
+        const data = doc.data();
+        const documentImageUrl = await getFileDownloadURL(doc.id);
+        return {
+          id: doc.id,
+          ...data,
+          documentImageUrl,
+        };
+      })
+    );
+
+    res.status(200).send(users);
   } catch (error) {
-    res.status(500).send("Error adding data: " + error.message);
+    res
+      .status(500)
+      .send({ error: "Error retrieving records: " + error.message });
   }
 });
+
+app.post(
+  "/imageUpload/:userId",
+  bodyParser.raw({ type: ["image/jpeg", "image/png"], limit: "5mb" }),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const contentType = req.headers["content-type"];
+
+      if (!userId) {
+        return res.status(400).send({ error: "Missing ID parameter" });
+      }
+
+      if (!req.body || req.body.length === 0) {
+        return res.status(400).send({ error: "No image data received" });
+      }
+
+      const allowedMimeTypes = ["image/jpeg", "image/png"];
+      if (!allowedMimeTypes.includes(contentType)) {
+        return res
+          .status(400)
+          .send({ error: "Invalid file type. Only JPEG and PNG are allowed." });
+      }
+
+      const fileName = `ID_Documents/${userId}`;
+      const storageRef = ref(storage, fileName);
+      const metadata = { contentType };
+
+      await uploadBytes(storageRef, req.body, metadata);
+
+      const imageUrl = await getDownloadURL(storageRef);
+
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { documentImageUrl: imageUrl });
+
+      res
+        .status(201)
+        .send({ message: "Image uploaded successfully", imageUrl });
+    } catch (error) {
+      console.error("Image upload error:", error);
+      res
+        .status(500)
+        .send({ error: "Error uploading image: " + error.message });
+    }
+  }
+);
+
+const subscriptionKey = process.env.SUSCRIPTION_KEY;
+const azureEndpoint = process.env.AZURE_API_URL;
+
+app.post(
+  "/detectFace",
+  bodyParser.raw({ type: ["image/jpeg", "image/png"], limit: "5mb" }),
+  async (req, res) => {
+    try {
+      const contentType = req.headers["content-type"];
+      if (!req.body || req.body.length === 0) {
+        return res.status(400).send({ error: "No image data received" });
+      }
+
+      const allowedMimeTypes = ["image/jpeg", "image/png"];
+      if (!allowedMimeTypes.includes(contentType)) {
+        return res
+          .status(400)
+          .send({ error: "Invalid file type. Only JPEG and PNG are allowed." });
+      }
+
+      // Generate a unique filename using timestamp
+      const fileName = `temp/temporalImage`;
+      const storageRef = ref(storage, fileName);
+      const metadata = { contentType };
+
+      await uploadBytes(storageRef, req.body, metadata);
+
+      const imageUrl = await getDownloadURL(storageRef);
+
+      // Azure Face API request
+      const response = await axios.post(
+        `${azureEndpoint}/face/v1.0/detect`,
+        {
+          url: imageUrl,
+        },
+        {
+          headers: {
+            "Ocp-Apim-Subscription-Key": subscriptionKey,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data && response.data?.length > 0) {
+        return res.status(200).send("Face Detected");
+      } else {
+        return res.status(400).send("No Face Detected");
+      }
+    } catch (error) {
+      console.error("Error during face analysis:", error);
+      res
+        .status(500)
+        .json({ message: "Error analyzing the face", error: error.message });
+    }
+  }
+);
 
 // Start the Express server
 app.listen(port, () => {
