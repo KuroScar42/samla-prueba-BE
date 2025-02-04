@@ -14,7 +14,6 @@ import { userSchema } from "./utils/index.js";
 import cors from "cors";
 import bodyParser from "body-parser";
 import axios from "axios";
-import FormData from "form-data";
 
 const app = express();
 const port = 3131;
@@ -71,12 +70,6 @@ app.post("/registerUser", async (req, res) => {
   }
 });
 
-const getFileDownloadURL = async (fileName) => {
-  const storageRef = ref(storage, `ID_Documents/${fileName}`);
-  const url = await getDownloadURL(storageRef);
-  return url;
-};
-
 app.get("/getAllUsers", async (req, res) => {
   try {
     const usersCollection = collection(db, "users");
@@ -84,11 +77,9 @@ app.get("/getAllUsers", async (req, res) => {
     const users = await Promise.all(
       querySnapshot.docs.map(async (doc) => {
         const data = doc.data();
-        const documentImageUrl = await getFileDownloadURL(doc.id);
         return {
           id: doc.id,
           ...data,
-          documentImageUrl,
         };
       })
     );
@@ -144,13 +135,59 @@ app.post(
         await updateDoc(userRef, { documentImageUrl: [imageUrl] });
       }
 
-      // await updateDoc(userRef, { documentImageUrl: imageUrl });
-
       res
         .status(201)
         .send({ message: "Image uploaded successfully", imageUrl });
     } catch (error) {
       console.error("Image upload error:", error);
+      res
+        .status(500)
+        .send({ error: "Error uploading image: " + error.message });
+    }
+  }
+);
+
+app.post(
+  "/selfieUpload/:userId",
+  bodyParser.raw({ type: ["image/jpeg", "image/png"], limit: "5mb" }),
+  async (req, res) => {
+    try {
+      const { userId, type } = req.params;
+      const contentType = req.headers["content-type"];
+
+      if (!userId) {
+        return res.status(400).send({ error: "Missing ID parameter" });
+      }
+
+      if (!req.body || req.body.length === 0) {
+        return res.status(400).send({ error: "No image data received" });
+      }
+
+      const allowedMimeTypes = ["image/jpeg", "image/png"];
+      if (!allowedMimeTypes.includes(contentType)) {
+        return res
+          .status(400)
+          .send({ error: "Invalid file type. Only JPEG and PNG are allowed." });
+      }
+
+      const fileName = `ID_Documents/${userId}-selfie`;
+      const storageRef = ref(storage, fileName);
+      const metadata = { contentType };
+
+      await uploadBytes(storageRef, req.body, metadata);
+
+      const imageUrl = await getDownloadURL(storageRef);
+
+      const userRef = doc(db, "users", userId);
+      const user = await getDoc(userRef);
+      const userData = user.data();
+
+      await updateDoc(userRef, { selfieImage: imageUrl });
+      res
+        .status(201)
+        .send({ message: "Selfie uploaded successfully", imageUrl });
+    } catch (error) {
+      console.error("Selfie upload error:", error);
       res
         .status(500)
         .send({ error: "Error uploading image: " + error.message });
