@@ -30,12 +30,12 @@ npm install
 Crea un archivo `.env` en la raíz del proyecto y agrega las siguientes variables:
 
 ```sh
-FIREBASE_API_KEY=tu_api_key
-FIREBASE_AUTH_DOMAIN=tu_auth_domain
-FIREBASE_PROJECT_ID=tu_project_id
-FIREBASE_STORAGE_BUCKET=tu_storage_bucket
-FIREBASE_MESSAGING_SENDER_ID=tu_messaging_sender_id
-FIREBASE_APP_ID=tu_app_id
+API_KEY=tu_api_key
+AUTH_DOMAIN=tu_auth_domain
+PROJECT_ID=tu_project_id
+STORAGE_BUCKET=tu_storage_bucket
+MESSAGING_SENDER_ID=tu_messaging_sender_id
+APP_ID=tu_app_id
 
 SUSCRIPTION_KEY=tu_suscription_key
 AZURE_API_URL=tu_azure_api_url
